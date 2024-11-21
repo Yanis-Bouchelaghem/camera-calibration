@@ -11,9 +11,12 @@ public:
 			float distanceBetweenCameras,
 			int cameraIndex,
 		    cv::TermCriteria criteria);
+	Camera(const Camera& other) = delete;
+	Camera& operator=(const Camera& other) = delete;
+	~Camera();
 
 	std::vector<cv::Point2f> Tick();
-	void Draw(const std::vector<cv::Point2f>& corners);
+	void Draw(const std::vector<cv::Point2f>& corners, float distanceToBoard);
 private:
 	const cv::Size checkerboardSize;
 	const float squareSize;
@@ -23,5 +26,6 @@ private:
 	std::vector<std::vector<cv::Point3f>> imgPoints;
 	const int cameraIndex;
 	cv::VideoCapture videoCapture;
-	cv::Mat frame, gray;
-};
+	cv::Mat frame;
+	cv::Mat gray;
+}; 

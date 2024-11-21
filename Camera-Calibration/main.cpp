@@ -17,98 +17,59 @@ const float SQUARE_SIZE = 13.0;  // en millimètres
 const float distance_between_cameras = 390.0;  // en millimètres
 
 int main() {
+    // Charger les données de calibration à partir du fichier XML/YAML
+    cv::FileStorage fs("calibration_data.npz", cv::FileStorage::READ);
+
+    if (!fs.isOpened()) {
+        std::cerr << "Erreur lors de l'ouverture du fichier de calibration." << std::endl;
+        return -1;
+    }
+
+    cv::Mat cameraMatrix, distCoeffs;
+    std::vector<cv::Mat> rvecs, tvecs;
+
+    fs["mtx"] >> cameraMatrix;
+    fs["dist"] >> distCoeffs;
+    fs["rvecs"] >> rvecs;
+    fs["tvecs"] >> tvecs;
+
+    fs.release();  // Fermer le fichier
+
+    // Afficher les matrices
+    std::cout << "Matrice de la caméra:" << std::endl << cameraMatrix << std::endl;
+    std::cout << "Coefficients de distorsion:" << std::endl << distCoeffs << std::endl;
+
     // Critère de terminaison
     TermCriteria criteria(TermCriteria::EPS + TermCriteria::MAX_ITER, 30, 0.001);
-    Camera myCamera(CHECKERBOARD_SIZE,
+    Camera camera0(CHECKERBOARD_SIZE,
+                    SQUARE_SIZE,
+                    distance_between_cameras,
+                    0,
+                    criteria);
+    Camera camera1(CHECKERBOARD_SIZE,
                     SQUARE_SIZE,
                     distance_between_cameras,
                     1,
                     criteria);
     while (true)
     {
-        auto corners = myCamera.Tick();
-        myCamera.Draw(corners);
-        // Appuyer sur 'q' pour quitter
-        if (waitKey(1) == 'q') {
-            break;
-        }
-    }
-    // Listes pour stocker les points d'objet et d'image pour les deux caméras
-    vector<vector<Point3f>> objpoints1, objpoints2;
-    vector<vector<Point2f>> imgpoints1, imgpoints2;
-
-    
-
-
-    // Accéder aux deux caméras
-    VideoCapture cap1(0);  // Caméra intégrée
-    VideoCapture cap2(1);  // Caméra externe
-
-    if (!cap1.isOpened() || !cap2.isOpened()) {
-        cerr << "Erreur de capture vidéo" << endl;
-        return -1;
-    }
-
-    Mat frame1, frame2, gray1, gray2;
-
-    while (true) 
-    {
-        // Capture des images des deux caméras
-        bool ret1 = cap1.read(frame1);
-        bool ret2 = cap2.read(frame2);
-
-        if (!ret1 || !ret2) {
-            cerr << "Erreur de capture vidéo" << endl;
-            break;
-        }
-
-        cvtColor(frame1, gray1, COLOR_BGR2GRAY);
-        cvtColor(frame2, gray2, COLOR_BGR2GRAY);
-
-        // Trouver les coins du damier pour chaque caméra
-        vector<Point2f> corners1, corners2;
-        bool found1 = findChessboardCorners(gray1, CHECKERBOARD_SIZE, corners1, CALIB_CB_ADAPTIVE_THRESH + CALIB_CB_FAST_CHECK + CALIB_CB_NORMALIZE_IMAGE);
-        bool found2 = findChessboardCorners(gray2, CHECKERBOARD_SIZE, corners2, CALIB_CB_ADAPTIVE_THRESH + CALIB_CB_FAST_CHECK + CALIB_CB_NORMALIZE_IMAGE);
-
-        if (found1 && found2) {
-            // Raffiner les coins pour chaque caméra
-            cornerSubPix(gray1, corners1, Size(11, 11), Size(-1, -1), criteria);
-            cornerSubPix(gray2, corners2, Size(11, 11), Size(-1, -1), criteria);
-
-            // Afficher les coins détectés
-            drawChessboardCorners(frame1, CHECKERBOARD_SIZE, corners1, found1);
-            drawChessboardCorners(frame2, CHECKERBOARD_SIZE, corners2, found2);
-
-            // Utiliser le premier coin pour calculer la distance (on peut choisir un autre repère selon le besoin)
-            Point2f point1 = corners1[0];  // coin supérieur gauche dans la caméra 1
-            Point2f point2 = corners2[0];  // coin supérieur gauche dans la caméra 2
-
+        auto corners0 = camera0.Tick();
+        auto corners1 = camera1.Tick();
+        float distance_to_board = 0.f;
+        if (!corners0.empty() && !corners1.empty())
+        {
             // Calculer la distance euclidienne en pixels entre les points correspondants
-            float pixel_distance = norm(point1 - point2);
-
+            float pixel_distance = norm(corners0[0] - corners1[0]);
             // Calculer la distance entre la plaque et les caméras
-            // En supposant que nous connaissons la distance entre les caméras et l'angle, on peut estimer la distance
-            float distance_to_board = (distance_between_cameras * SQUARE_SIZE) / pixel_distance;
+            distance_to_board = (distance_between_cameras * SQUARE_SIZE) / pixel_distance;
 
-            // Afficher la distance sur chaque flux vidéo
-            putText(frame1, "Distance: " + to_string(distance_to_board) + " mm", Point(50, 50), FONT_HERSHEY_SIMPLEX, 1, Scalar(0, 255, 0), 2);
-            putText(frame2, "Distance: " + to_string(distance_to_board) + " mm", Point(50, 50), FONT_HERSHEY_SIMPLEX, 1, Scalar(0, 255, 0), 2);
         }
-
-        // Afficher les flux en temps réel pour les deux caméras
-        imshow("Camera 1", frame1);
-        imshow("Camera 2", frame2);
-
+        camera0.Draw(corners0, distance_to_board);
+        camera1.Draw(corners1, distance_to_board);
         // Appuyer sur 'q' pour quitter
         if (waitKey(1) == 'q') {
             break;
         }
     }
-
-    // Libérer les captures et fermer les fenêtres
-    cap1.release();
-    cap2.release();
-    destroyAllWindows();
-
     return 0;
 }

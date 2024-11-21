@@ -133,6 +133,9 @@
   <ItemGroup>
     <ClInclude Include="Camera.h" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="calibration_data.npz" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
